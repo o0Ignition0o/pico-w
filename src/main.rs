@@ -7,19 +7,15 @@ use defmt_rtt as _;
 
 use panic_probe as _;
 
-#[cfg(feature = "rp2040")]
-use embassy_executor::{Executor, Spawner};
+use embassy_executor::Executor;
 use embassy_time::{Duration, Timer};
 
-#[cfg(feature = "rp2040")]
 use embassy_rp::{
     gpio::{Level, Output},
     multicore::{spawn_core1, Stack},
-    peripherals::PIN_25,
+    Peripheral, Peripherals,
 };
 
-
-#[cfg(feature = "cortex-m")]
 use cortex_m_rt::{exception, ExceptionFrame};
 
 use embassy_pico_template::info;
@@ -35,22 +31,24 @@ static CORE1_EXECUTOR: StaticCell<Executor> = StaticCell::new();
 // TODO: Set a stack size for the second core
 static mut CORE1_STACK: Stack<{ 30 * 1024 }> = Stack::new();
 
-#[cfg(feature = "cortex-m")]
 #[cortex_m_rt::entry]
 fn main() -> ! {
     embassy_rp::pac::SIO.spinlock(31).write_value(1);
 
     let peripherals = embassy_rp::init(Default::default());
-    let led = Output::new(peripherals.PIN_25, Level::Low);
 
-    spawn_core1(peripherals.CORE1, unsafe { &mut CORE1_STACK }, move || {
-        let core1_executor = CORE1_EXECUTOR.init(Executor::new());
+    spawn_core1(
+        unsafe { peripherals.CORE1.clone_unchecked() },
+        unsafe { &mut CORE1_STACK },
+        move || {
+            let core1_executor = CORE1_EXECUTOR.init(Executor::new());
 
-        core1_executor.run(|spawner| spawner.must_spawn(print()))
-    });
+            core1_executor.run(|spawner| spawner.must_spawn(print()))
+        },
+    );
 
     let core0_executor = CORE0_EXECUTOR.init(Executor::new());
-    core0_executor.run(|spawner| spawner.must_spawn(blinky(led)))
+    core0_executor.run(|spawner| spawner.must_spawn(blinky(peripherals)))
 }
 
 #[cfg(feature = "rp2040")]
@@ -62,17 +60,28 @@ async fn print() {
     }
 }
 
-
-#[cfg(feature = "rp2040")]
 #[embassy_executor::task()]
-async fn blinky(mut led: Output<'static, PIN_25>) {
+async fn blinky(peripherals: Peripherals) {
+    let mut blue_led = Output::new(peripherals.PIN_14, Level::Low);
+    let mut red_led = Output::new(peripherals.PIN_17, Level::Low);
+    let mut onboard_led = Output::new(peripherals.PIN_25, Level::Low);
+
     loop {
-        info!("led on!");
-        led.set_high();
+        info!("blue!");
+        blue_led.set_high();
+        red_led.set_low();
+        onboard_led.set_low();
         Timer::after(Duration::from_secs(1)).await;
 
-        info!("led off!");
-        led.set_low();
+        info!("red!");
+        blue_led.set_low();
+        red_led.set_high();
+        onboard_led.set_low();
+        Timer::after(Duration::from_secs(1)).await;
+        info!("onboard!");
+        blue_led.set_low();
+        red_led.set_low();
+        onboard_led.set_high();
         Timer::after(Duration::from_secs(1)).await;
     }
 }
