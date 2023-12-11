@@ -50,7 +50,7 @@ fn main() -> ! {
 
     let core0_executor = CORE0_EXECUTOR.init(Executor::new());
     // core0_executor.run(|spawner| spawner.must_spawn(blinky(peripherals)))
-    core0_executor.run(|spawner| spawner.must_spawn(dpad_scan(peripherals)))
+    core0_executor.run(|spawner| spawner.must_spawn(keypad_scan(peripherals)))
 }
 
 #[cfg(feature = "rp2040")]
@@ -63,7 +63,7 @@ async fn print() {
 }
 
 #[embassy_executor::task()]
-async fn dpad_scan(peripherals: Peripherals) {
+async fn keypad_scan(peripherals: Peripherals) {
     let mut key_pad = KeyPad::new(
         peripherals.PIN_13,
         peripherals.PIN_12,
