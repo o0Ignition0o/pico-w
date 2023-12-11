@@ -7,3 +7,6 @@ pub use macros::*;
 
 // This mod MUST go first, so that the others see its macros.
 mod macros;
+
+pub mod keypad;
+pub mod lcd;
