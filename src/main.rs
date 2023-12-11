@@ -100,6 +100,7 @@ where
         Output<'k, R3>,
         Output<'k, R4>,
     ),
+    last_pressed_key: Option<Key>,
 }
 
 impl<'k, C1, C2, C3, C4, R1, R2, R3, R4> KeyPad<'k, C1, C2, C3, C4, R1, R2, R3, R4>
@@ -127,6 +128,7 @@ where
                 Output::new(r3, Level::Low),
                 Output::new(r4, Level::Low),
             ),
+            last_pressed_key: None,
         }
     }
 
@@ -140,15 +142,21 @@ where
 
         let buttons = self.pressed_button();
 
+        let mut last_pressed_key = None;
         for (row, column) in buttons.iter().enumerate() {
             for (col, is_pressed) in column.iter().enumerate() {
                 if *is_pressed {
-                    return Some(all_buttons[row][col].clone());
+                    last_pressed_key = Some(all_buttons[row][col]);
                 }
             }
         }
 
-        None
+        if last_pressed_key != self.last_pressed_key {
+            self.last_pressed_key = last_pressed_key;
+            self.last_pressed_key
+        } else {
+            None
+        }
     }
 
     fn pressed_button(&mut self) -> [[bool; 4]; 4] {
@@ -175,7 +183,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Key {
     One,
     Two,
