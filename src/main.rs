@@ -38,33 +38,8 @@ fn main() -> ! {
 
     let peripherals = embassy_rp::init(Default::default());
 
-    spawn_core1(
-        unsafe { peripherals.CORE1.clone_unchecked() },
-        unsafe { &mut CORE1_STACK },
-        move || {
-            let core1_executor = CORE1_EXECUTOR.init(Executor::new());
-
-            core1_executor.run(|spawner| spawner.must_spawn(print()))
-        },
-    );
-
-    let core0_executor = CORE0_EXECUTOR.init(Executor::new());
-    // core0_executor.run(|spawner| spawner.must_spawn(blinky(peripherals)))
-    core0_executor.run(|spawner| spawner.must_spawn(keypad_scan(peripherals)))
-}
-
-#[cfg(feature = "rp2040")]
-#[embassy_executor::task()]
-async fn print() {
-    loop {
-        // info!("Printing on Core 1 every 2 secs...");
-        Timer::after(Duration::from_secs(2)).await;
-    }
-}
-
-#[embassy_executor::task()]
-async fn keypad_scan(peripherals: Peripherals) {
-    let mut key_pad = KeyPad::new(
+    let (i2c, sda, scl) = (peripherals.I2C1, peripherals.PIN_26, peripherals.PIN_27);
+    let (one, two, three, four, five, six, seven, eight) = (
         peripherals.PIN_13,
         peripherals.PIN_12,
         peripherals.PIN_11,
@@ -74,6 +49,71 @@ async fn keypad_scan(peripherals: Peripherals) {
         peripherals.PIN_20,
         peripherals.PIN_21,
     );
+
+    spawn_core1(
+        unsafe { peripherals.CORE1.clone_unchecked() },
+        unsafe { &mut CORE1_STACK },
+        move || {
+            let core1_executor = CORE1_EXECUTOR.init(Executor::new());
+
+            core1_executor.run(|spawner| spawner.must_spawn(lcd(i2c, sda, scl)))
+        },
+    );
+
+    let core0_executor = CORE0_EXECUTOR.init(Executor::new());
+    // core0_executor.run(|spawner| spawner.must_spawn(blinky(peripherals)))
+    core0_executor.run(|spawner| {
+        spawner.must_spawn(keypad_scan(one, two, three, four, five, six, seven, eight))
+    })
+}
+
+#[cfg(feature = "rp2040")]
+#[embassy_executor::task()]
+async fn print() {
+    loop {
+        info!("Printing on Core 1 every 2 secs...");
+        Timer::after(Duration::from_secs(2)).await;
+    }
+}
+
+#[cfg(feature = "rp2040")]
+#[embassy_executor::task()]
+async fn lcd(
+    i2c: embassy_rp::peripherals::I2C1,
+    sda: embassy_rp::peripherals::PIN_26,
+    scl: embassy_rp::peripherals::PIN_27,
+) {
+    use embassy_rp::{
+        bind_interrupts,
+        i2c::{Config, I2c, InterruptHandler},
+        peripherals::I2C1,
+    };
+
+    bind_interrupts!(struct Irqs {
+        I2C1_IRQ => InterruptHandler<I2C1>;
+    });
+
+    let mut i2c = I2c::new_async(i2c, scl, sda, Irqs, Config::default());
+
+    const LCD_ADDRESS: u8 = 0x20;
+    loop {
+        // info!("Printing on Core 1 every 2 secs...");
+        Timer::after(Duration::from_secs(2)).await;
+    }
+}
+
+#[embassy_executor::task()]
+async fn keypad_scan(
+    one: embassy_rp::peripherals::PIN_13,
+    two: embassy_rp::peripherals::PIN_12,
+    three: embassy_rp::peripherals::PIN_11,
+    four: embassy_rp::peripherals::PIN_10,
+    five: embassy_rp::peripherals::PIN_18,
+    six: embassy_rp::peripherals::PIN_19,
+    seven: embassy_rp::peripherals::PIN_20,
+    eight: embassy_rp::peripherals::PIN_21,
+) {
+    let mut key_pad = KeyPad::new(one, two, three, four, five, six, seven, eight);
 
     loop {
         if let Some(key) = key_pad.pressed_key() {
