@@ -90,11 +90,12 @@ async fn lcd(
         I2C1_IRQ => InterruptHandler<I2C1>;
     });
 
-    let mut i2c = I2c::new_async(i2c, scl, sda, Irqs, Config::default());
-    const LCD_ADDRESS: u8 = 0x20;
+    let i2c = I2c::new_async(i2c, scl, sda, Irqs, Config::default());
+    const LCD_ADDRESS: u8 = 0x27;
 
-    let mut lcd = Lcd::new(i2c, LCD_ADDRESS);
+    let mut lcd = Lcd::try_new(i2c, LCD_ADDRESS).await.unwrap();
 
+    lcd.hello().await.unwrap();
     loop {
         // info!("Printing on Core 1 every 2 secs...");
         Timer::after(Duration::from_secs(2)).await;
